@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEE Rank Predictor — ML-Powered</title>
+    <meta name="description" content="Predict your JEE Main rank using Random Forest and XGBoost ML models trained on 17 years of data (2009-2026).">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <!-- ── HERO ── -->
+    <header class="hero-section">
+        <div class="container">
+            <div class="hero-badge">✨ RF + XGBoost · SMOTE · Confidence Intervals</div>
+            <h1 class="hero-title">JEE Rank Predictor</h1>
+            <p class="hero-subtitle">
+                Predict your JEE Main rank using Random Forest Regression with tree-based confidence intervals,
+                and get your competitive category via XGBoost classification — trained on 17 years of data.
+            </p>
+        </div>
+    </header>
+
+    <!-- ── INPUT BAR ── -->
+    <section class="input-section">
+        <div class="container">
+            <div class="input-bar glass-card">
+                <div class="input-group">
+                    <label for="marks-slider">🎯 Marks</label>
+                    <input type="range" id="marks-slider" min="0" max="300" value="150" step="1">
+                    <span class="input-value" id="marks-value">150</span>
+                </div>
+                <div class="input-group">
+                    <label for="year-slider">📅 Year</label>
+                    <input type="range" id="year-slider" min="2009" max="2026" value="2025" step="1">
+                    <span class="input-value" id="year-value">2025</span>
+                </div>
+                <div class="input-group">
+                    <label for="candidates-input">👥 Candidates</label>
+                    <input type="number" id="candidates-input" value="1400000" min="500000" max="2000000" step="50000">
+                </div>
+                <button id="predict-btn" class="predict-btn">
+                    <span class="btn-text">Predict Rank</span>
+                    <span class="btn-loader" style="display:none;">⏳</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── PREDICTION CARDS ── -->
+    <section class="predictions-section">
+        <div class="container">
+            <div class="cards-grid">
+                <div class="pred-card indigo" id="card-rf">
+                    <div class="pred-label indigo">RF Predicted Rank</div>
+                    <div class="pred-value" id="rf-rank">—</div>
+                    <div class="pred-sub">Random Forest (300 trees)</div>
+                </div>
+                <div class="pred-card cyan" id="card-range">
+                    <div class="pred-label cyan">Rank Range (80% CI)</div>
+                    <div class="pred-value range-value" id="rf-range">— – —</div>
+                    <div class="pred-sub">10th–90th percentile</div>
+                </div>
+                <div class="pred-card emerald" id="card-pct">
+                    <div class="pred-label emerald">Percentile</div>
+                    <div class="pred-value" id="pct-value">—%</div>
+                    <div class="pred-sub">Based on RF rank</div>
+                </div>
+                <div class="pred-card rose" id="card-lr">
+                    <div class="pred-label rose">Poly LR Rank</div>
+                    <div class="pred-value" id="lr-rank">—</div>
+                    <div class="pred-sub">Degree-3 Polynomial</div>
+                </div>
+                <div class="pred-card amber" id="card-cat">
+                    <div class="pred-label amber">Category</div>
+                    <div class="category-badge-wrap" id="cat-badge">
+                        <span class="category-badge cat-comp">📊 Loading...</span>
+                    </div>
+                    <div class="pred-sub">XGBoost + SMOTE</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── TABS ── -->
+    <section class="tabs-section">
+        <div class="container">
+            <div class="tab-header">
+                <button class="tab-btn active" data-tab="analytics">📈 Visual Analytics</button>
+                <button class="tab-btn" data-tab="performance">🧮 Model Performance</button>
+                <button class="tab-btn" data-tab="explorer">🔍 Data Explorer</button>
+            </div>
+
+            <!-- Tab 1: Analytics -->
+            <div class="tab-content active" id="tab-analytics">
+                <div class="chart-row">
+                    <div class="chart-box" id="scatter-chart"></div>
+                    <div class="chart-box" id="bar-chart"></div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-box" id="gauge-chart"></div>
+                    <div class="chart-box" id="trend-chart"></div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Performance -->
+            <div class="tab-content" id="tab-performance">
+                <h3 class="section-title">📊 Regression Model Comparison</h3>
+                <div class="table-wrap glass-card">
+                    <table class="data-table" id="reg-table">
+                        <thead><tr>
+                            <th>Model</th><th>R²</th><th>Adj R²</th><th>MAE</th><th>RMSE</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div class="metric-cards-row" id="rf-metric-cards"></div>
+
+                <h3 class="section-title">🏷️ Classification — XGBoost + SMOTE</h3>
+                <div class="metric-cards-row" id="cls-metric-cards"></div>
+
+                <div class="table-wrap glass-card">
+                    <table class="data-table" id="cls-table">
+                        <thead><tr>
+                            <th>Category</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Explorer -->
+            <div class="tab-content" id="tab-explorer">
+                <div class="explorer-controls glass-card">
+                    <div class="input-group">
+                        <label for="explorer-year">Year</label>
+                        <select id="explorer-year"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="explorer-min">Min Marks</label>
+                        <input type="number" id="explorer-min" value="50" min="0" max="300">
+                    </div>
+                    <div class="input-group">
+                        <label for="explorer-max">Max Marks</label>
+                        <input type="number" id="explorer-max" value="250" min="0" max="300">
+                    </div>
+                    <button id="explorer-btn" class="predict-btn" style="min-width:100px;">Filter</button>
+                </div>
+                <div class="explorer-info" id="explorer-info"></div>
+                <div class="table-wrap glass-card">
+                    <table class="data-table" id="explorer-table">
+                        <thead><tr>
+                            <th>Marks</th><th>Percentile</th><th>Rank</th><th>Candidates</th><th>Category</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="chart-box full-width" id="heatmap-chart"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── FOOTER ── -->
+    <footer class="footer">
+        <div class="container">
+            <p>Built with ❤️ using <strong>Flask</strong>, <strong>Scikit-Learn</strong>, <strong>XGBoost</strong> & <strong>SMOTE</strong></p>
+            <p>Data: JEE Main Results (2009–2026) · Models: Random Forest, Polynomial LR, XGBoost Classifier</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
